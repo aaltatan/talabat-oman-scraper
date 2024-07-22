@@ -1,0 +1,8 @@
+venv/
+.scrapy/
+__pycache__/
+tests/
+
+*.jsonl
+*.xlsx
+*.log
