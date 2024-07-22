@@ -4,7 +4,7 @@ from scrapy.http import Request, Response
 import logging
 import scrapy
 import json
-
+import math
 
 logging.basicConfig(
     filemode='a',
@@ -35,56 +35,50 @@ class SiteMapSpider(scrapy.Spider):
             .getall()
         )
         for link in links:
+            link_list = link.split('/')
+            id = link_list[-2]
+            slug = link_list[-1]
+            url = f'https://www.talabat.com/_next/data/manifests/listing.json?countrySlug=oman&areaId={id}&areaSlug={slug}'
             yield Request(
-                url=res.urljoin(link),
-                callback=self.parse_pagination
+                url=url,
+                callback=self.parse_pagination,
+                cb_kwargs={'id': id, 'slug': slug}
             )
+            
+    def parse_pagination(self, res: Response, id: int, slug: str):
 
-    def parse_pagination(self, res: Response):
-
-        response: scrapy.Selector = res.copy()
-        last_page = response.css('ul[data-test="pagination"] li.-last a::attr(page)').get('')
-        for idx in range(1, int(last_page) + 1):
-            yield Request(
-                url=res.url + f'?page={idx}',
-                callback=self.parse_pages
-            )
-
-    def parse_pages(self, res: Response):
-
-        response: scrapy.Selector = res.copy()
-        next_data = response.css('#__NEXT_DATA__::text').get('')
-        data: dict = json.loads(next_data)
-        vendors: list[dict] = data['props']['pageProps']['data']['vendors']
-        for vendor in vendors:
-            link = vendor['menuUrl']
-            yield Request(
-                url=res.urljoin(link)+'?aid=5649',
-                callback=self.parse_menu,
-                cb_kwargs={'id': vendor['id']},
-            )
-
-    def parse_menu(self, res: Response, id: str):
-
-        response: scrapy.Selector = res.copy()
-        next_data = response.css('#__NEXT_DATA__::text').get('')
-        data: dict = json.loads(next_data)
-        facility: dict = json.dumps(data['props']['pageProps'])
-
-        yield Request(
-            url=f'https://www.talabat.com/nextApi/v1/restaurant/{id}/reviews',
-            callback=self.parse_id,
-            cb_kwargs={'facility': facility}
-        )
-        
-    
-    def parse_id(self, res: Response, facility: str):
         response: dict = json.loads(res.text)
         
-        reviews: list[dict] = response['result']
-        facility: dict = json.loads(facility)
+        total_vendors = int(response['pageProps']['data']['totalVendors'])
+        pages_count = math.ceil(total_vendors / 15)
         
-        yield {
-            **facility,
-            'reviews': reviews,
-        }
+        for idx in range(1, pages_count + 1):
+            url = f'https://www.talabat.com/_next/data/manifests/listing.json?countrySlug=oman&areaId={id}&areaSlug={slug}&page={idx}'
+            yield Request(
+                url=url,
+                callback=self.parse_data
+            )
+        
+    def parse_data(self, res: Response):
+        response: dict = json.loads(res.text)
+        vendors = response['pageProps']['data']['vendors']
+        for v in vendors:
+            yield v
+            # id = v['id']
+            # vendor = json.dumps(v)
+            # yield Request(
+            #     url=f'https://www.talabat.com/nextApi/v1/restaurant/{id}/reviews',
+            #     callback=self.parse_facility,
+            #     cb_kwargs={'vendor': vendor}
+            # )
+        
+    # def parse_facility(self, res: Response, vendor: str):
+    #     response: dict = json.loads(res.text)
+        
+    #     reviews: list[dict] = response['result']
+    #     vendor: dict = json.loads(vendor)
+        
+    #     yield {
+    #         **vendor,
+    #         'reviews': reviews,
+    #     }
