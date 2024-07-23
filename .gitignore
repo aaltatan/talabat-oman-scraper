@@ -2,7 +2,9 @@ venv/
 .scrapy/
 __pycache__/
 tests/
+.ipynb_checkpoints/
 
 *.jsonl
 *.xlsx
 *.log
+*.csv

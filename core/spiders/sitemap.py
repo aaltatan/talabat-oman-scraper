@@ -1,10 +1,11 @@
 import scrapy
 from scrapy.crawler import CrawlerProcess
-from scrapy.http import Request, Response
+from scrapy.http import Request, Response, FormRequest
 import logging
 import scrapy
 import json
 import math
+
 
 logging.basicConfig(
     filemode='a',
@@ -53,9 +54,17 @@ class SiteMapSpider(scrapy.Spider):
         pages_count = math.ceil(total_vendors / 15)
         
         for idx in range(1, pages_count + 1):
-            url = f'https://www.talabat.com/_next/data/manifests/listing.json?countrySlug=oman&areaId={id}&areaSlug={slug}&page={idx}'
-            yield Request(
+            params: dict = {
+                'countrySlug': 'oman',
+                'areaId': str(id),
+                'areaSlug': slug,
+                'page': str(idx),
+            }
+            url = 'https://www.talabat.com/_next/data/manifests/listing.json'
+            yield FormRequest(
                 url=url,
+                method='GET',
+                formdata=params,
                 callback=self.parse_data
             )
         
@@ -63,22 +72,7 @@ class SiteMapSpider(scrapy.Spider):
         response: dict = json.loads(res.text)
         vendors = response['pageProps']['data']['vendors']
         for v in vendors:
-            yield v
-            # id = v['id']
-            # vendor = json.dumps(v)
-            # yield Request(
-            #     url=f'https://www.talabat.com/nextApi/v1/restaurant/{id}/reviews',
-            #     callback=self.parse_facility,
-            #     cb_kwargs={'vendor': vendor}
-            # )
-        
-    # def parse_facility(self, res: Response, vendor: str):
-    #     response: dict = json.loads(res.text)
-        
-    #     reviews: list[dict] = response['result']
-    #     vendor: dict = json.loads(vendor)
-        
-    #     yield {
-    #         **vendor,
-    #         'reviews': reviews,
-    #     }
+            yield {
+                **v,
+                'url': res.url,
+            }
