@@ -1,9 +1,18 @@
+import json
+import math
+import logging
+
 import scrapy
 from scrapy.http import FormRequest, Response
 
-import json
-import math
-
+logging.basicConfig(
+    filemode='a',
+    filename='logger.log',
+    format='[%(asctime)s] %(levelname)s | %(name)s => %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    encoding='utf-8',
+    level=logging.INFO
+)
 
 class ItemsSpider(scrapy.Spider):
     
@@ -65,6 +74,7 @@ class ItemsSpider(scrapy.Spider):
         response: dict = json.loads(res.text)
         shops = response['pageProps']['gtmEventData']['shops']
         for shop in shops:
+            
             branch_id = shop['branchId']
             branch_slug = shop['branchSlug']
             
@@ -111,10 +121,15 @@ class ItemsSpider(scrapy.Spider):
                 
                 category_slug = cat['slug']
                 subcategories = cat['subCategories']
+                category = cat
+                del category['subCategories']
+                category = json.dumps(category)
                 
-                for subcategory in subcategories:
+                for subcat in subcategories:
                     
-                    subcategory_slug = subcategory['slug']
+                    subcategory_slug = subcat['slug']
+                    
+                    subcategory = json.dumps(subcat)
                     
                     url = 'https://www.talabat.com/_next/data/manifests/grocery-items.json'
                     
@@ -138,6 +153,8 @@ class ItemsSpider(scrapy.Spider):
                             'category_slug': category_slug,
                             'subcategory_slug': subcategory_slug,
                             'area_id': area_id,
+                            'category': category,
+                            'subcategory': subcategory,
                         },
                         callback=self.parse_items_pagination
                     )
@@ -151,6 +168,8 @@ class ItemsSpider(scrapy.Spider):
         category_slug: str,
         subcategory_slug: str,
         area_id: str,
+        category: str,
+        subcategory: str,
     ):
         response: dict = json.loads(res.text)
         pages_count = response['pageProps']['initialState']['itemsData']['pageCount']
@@ -174,11 +193,16 @@ class ItemsSpider(scrapy.Spider):
                 url=url,
                 formdata=params,
                 method='GET',
-                callback=self.parse_items
+                callback=self.parse_items,
+                cb_kwargs={
+                    'category': category,
+                    'subcategory': subcategory,
+                }
             )
             
     
-    def parse_items(self, res: Response):
+    def parse_items(self, res: Response, category: str, subcategory: str):
+        
         response: dict = json.loads(res.text)
         store = response['pageProps']['initialState']['groceryStore']
         items = response['pageProps']['initialState']['itemsData']['items']
@@ -186,5 +210,7 @@ class ItemsSpider(scrapy.Spider):
         for item in items:
             yield {
                 'store': store,
+                'category': json.loads(category),
+                'subcategory': json.loads(subcategory),
                 **item
             }

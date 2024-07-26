@@ -3,6 +3,7 @@ venv/
 __pycache__/
 tests/
 .ipynb_checkpoints/
+jobs/
 
 *.jsonl
 *.xlsx
