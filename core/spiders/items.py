@@ -208,7 +208,7 @@ class ItemsSpider(scrapy.Spider):
         items = response['pageProps']['initialState']['itemsData']['items']
         
         for item in items:
-            yield {
+            data = {
                 'store': store,
                 'category': json.loads(category),
                 'subcategory': json.loads(subcategory),
